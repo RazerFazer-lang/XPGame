@@ -13,6 +13,7 @@
     "build": "tsc -b && vite build",
     "start": "node server/dist/server/src/index.js",
     "test": "tsx --tsconfig tsconfig.server.json --test tests/*.test.ts",
+    "test:integration": "tsx tests/multiplayer.integration.test.ts",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
