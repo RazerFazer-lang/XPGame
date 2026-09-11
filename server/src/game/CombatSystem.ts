@@ -24,12 +24,24 @@ export function moveEnemyTowardPlayer(enemy: EnemyState, player: PlayerState, de
 
 export function addXpDrop(state: GameState, id: string, x: number, y: number, value: number): void { const drop = new XpDropState(); drop.x = x; drop.y = y; drop.value = value; state.xpDrops.set(id, drop); }
 export function addLoot(state: GameState, id: string, x: number, y: number, kind = "coin", value = 1, rarity = "common"): void { const drop = new LootState(); drop.x = x; drop.y = y; drop.kind = kind; drop.value = value; drop.rarity = rarity; state.loot.set(id, drop); }
-export function addPlayerXp(player: PlayerState, amount: number): boolean { let leveled = false; player.xp += amount; while (player.xp >= player.xpToNext) { player.xp -= player.xpToNext; player.level += 1; player.xpToNext = Math.floor(player.xpToNext * 1.22 + 18); leveled = true; } return leveled; }
+export function addPlayerXp(player: PlayerState, amount: number): boolean {
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(player.xp) || !Number.isFinite(player.xpToNext) || player.xpToNext <= 0) return false;
+  let leveled = false;
+  player.xp += amount;
+  while (player.xp >= player.xpToNext) {
+    player.xp -= player.xpToNext;
+    player.level += 1;
+    player.xpToNext = Math.floor(player.xpToNext * 1.22 + 18);
+    leveled = true;
+  }
+  return leveled;
+}
 
 const WEAPONS: Record<string, { cooldown: number; count: number; spread: number; speed: number; multiplier: number }> = { rifle: { cooldown: 350, count: 1, spread: 0, speed: 760, multiplier: 1 }, shotgun: { cooldown: 650, count: 5, spread: 0.48, speed: 660, multiplier: 0.58 }, smg: { cooldown: 150, count: 1, spread: 0.03, speed: 820, multiplier: 0.62 }, cannon: { cooldown: 900, count: 1, spread: 0, speed: 520, multiplier: 2.8 }, arc: { cooldown: 450, count: 3, spread: 0.34, speed: 880, multiplier: 0.82 } };
 
 export function fireProjectile(state: GameState, playerId: string, nextId: () => string): boolean {
   const player = state.players.get(playerId); if (!player || state.phase !== "playing" || player.downed || player.hp <= 0 || player.attackTimerMs > 0) return false;
+  if (state.projectiles.size >= GAME.maxProjectiles) return false;
   const weapon = WEAPONS[player.weapon] ?? WEAPONS.rifle!;
   const levelScale = 1 + Math.max(0, player.weaponLevel - 1) * 0.12;
   const count = Math.max(1, Math.min(12, Math.floor(Math.max(player.projectileCount, weapon.count)))); const totalSpread = count === 1 ? weapon.spread : Math.min(1.2, Math.max(player.spread, weapon.spread));

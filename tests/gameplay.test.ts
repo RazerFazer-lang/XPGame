@@ -25,6 +25,14 @@ test("XP supports multiple levels from one large pickup", () => {
   assert.ok(player.xp < player.xpToNext);
 });
 
+test("invalid XP cannot corrupt player progression", () => {
+  const player = new PlayerState();
+  assert.equal(addPlayerXp(player, -100), false);
+  assert.equal(addPlayerXp(player, Number.NaN), false);
+  assert.equal(player.xp, 0);
+  assert.equal(player.level, 1);
+});
+
 test("upgrade choices are unique", () => {
   const player = new PlayerState();
   const choices = getUpgradeChoices(player, 3);

@@ -1,9 +1,8 @@
+import { GAME } from "../../../shared/src/constants.js";
 import { GameState, PlayerState } from "../state/GameState.js";
 import { addPlayerXp, addLoot, addXpDrop, moveEnemyTowardPlayer } from "./CombatSystem.js";
 
 const CELL_SIZE = 120;
-const GAME_RESPAWN_MS = 7000;
-
 function nearestLivingPlayer(state: GameState, x: number, y: number): PlayerState | undefined {
   let target: PlayerState | undefined;
   let best = Number.POSITIVE_INFINITY;
@@ -22,7 +21,8 @@ function applyDownedState(state: GameState, player: PlayerState, damage: number)
   player.hp = Math.max(0, player.hp - damage);
   if (player.hp > 0) return;
   player.downed = true;
-  player.respawnMs = GAME_RESPAWN_MS;
+  player.respawnMs = GAME.downedRespawnMs;
+  player.reviveTimerMs = GAME.reviveMs;
   player.lives = Math.max(0, player.lives - 1);
 }
 
@@ -32,13 +32,15 @@ function updatePlayers(state: GameState, deltaMs: number): void {
     if (reviver.downed || reviver.hp <= 0) continue;
     for (const target of state.players.values()) {
       if (target === reviver || !target.downed || target.lives <= 0) continue;
-      if (Math.hypot(reviver.x - target.x, reviver.y - target.y) <= 90) {
-        target.respawnMs = Math.max(0, target.respawnMs - deltaMs);
-        if (target.respawnMs <= 0) {
+      if (Math.hypot(reviver.x - target.x, reviver.y - target.y) <= GAME.reviveRange) {
+        const reviveTimer = target.reviveTimerMs > 0 ? target.reviveTimerMs : target.respawnMs;
+        target.reviveTimerMs = Math.max(0, reviveTimer - deltaMs);
+        if (target.reviveTimerMs <= 0) {
           target.downed = false;
           target.hp = Math.ceil(target.maxHp * 0.45);
           reviver.revives += 1;
           target.respawnMs = 0;
+          target.reviveTimerMs = 0;
           reviver.score += 100;
         }
       }
@@ -51,6 +53,7 @@ function updatePlayers(state: GameState, deltaMs: number): void {
     if (player.respawnMs <= 0 && player.lives > 0) {
       player.downed = false;
       player.hp = player.maxHp;
+      player.reviveTimerMs = 0;
       player.x = 960;
       player.y = 540;
     }
