@@ -68,6 +68,7 @@ export class GameState extends Schema {
   @type("number") elapsedMs = 0;
   @type("number") spawnTimerMs = 0;
   @type("number") enemiesDefeated = 0;
+  @type("number") bossesDefeated = 0;
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   @type({ map: EnemyState }) enemies = new MapSchema<EnemyState>();
   @type({ map: ProjectileState }) projectiles = new MapSchema<ProjectileState>();
