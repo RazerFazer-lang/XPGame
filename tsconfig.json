@@ -9,6 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "skipLibCheck": true,
     "noEmitOnError": true
   }
