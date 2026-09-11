@@ -16,15 +16,12 @@ function sleep(ms: number): Promise<void> {
 async function waitFor(label: string, predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const started = Date.now();
   while (!predicate()) {
-    if (Date.now() - started > timeoutMs) {
-      throw new Error(`Timeout while waiting for ${label}`);
-    }
+    if (Date.now() - started > timeoutMs) throw new Error(`Timeout while waiting for ${label}`);
     await sleep(50);
   }
 }
 
 async function waitForHealth(): Promise<void> {
-  await waitFor("server health", async () => false, 1).catch(() => undefined);
   const started = Date.now();
   let lastError = "unknown";
   while (Date.now() - started < 15_000) {
@@ -64,7 +61,6 @@ async function waitForPhase(room: BotRoom, expected: string, label: string): Pro
 test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect", { timeout: 45_000 }, async t => {
   const server = startServer();
   const bots: BotRoom[] = [];
-
   let stdout = "";
   let stderr = "";
   server.stdout?.on("data", chunk => { stdout += String(chunk); });
@@ -72,11 +68,7 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
 
   t.after(async () => {
     for (const room of bots) {
-      try {
-        await room.leave();
-      } catch {
-        // Cleanup must remain best-effort.
-      }
+      try { await room.leave(); } catch {}
     }
     if (!server.killed) server.kill("SIGTERM");
     await sleep(150);
@@ -85,29 +77,27 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
 
   await waitForHealth();
 
-  const clients = Array.from({ length: BOT_COUNT }, (_, index) => new Client(BASE_URL));
-  const joined = await Promise.all(clients.map((client, index) =>
-    client.joinOrCreate("game", {
-      name: `AI-Bot-${index + 1}`,
-      mapId: "neon_city",
-    }),
-  ));
-  bots.push(...joined);
+  // Bot 1 creates the lobby; bots 2-4 explicitly join the same room.
+  const firstClient = new Client(BASE_URL);
+  const first = await firstClient.joinOrCreate("game", { name: "AI-Bot-1", mapId: "neon_city" });
+  bots.push(first);
+  const roomId = first.roomId;
 
-  assert.equal(new Set(joined.map(room => room.roomId)).size, 1, "all 4 bots must share one room");
-  const roomId = joined[0]!.roomId;
-
-  for (const room of joined) {
-    await waitForRoomPlayers(room, BOT_COUNT, "multiplayer room");
+  for (let index = 1; index < BOT_COUNT; index += 1) {
+    const client = new Client(BASE_URL);
+    bots.push(await client.joinById(roomId, { name: `AI-Bot-${index + 1}`, mapId: "neon_city" }));
   }
+
+  for (const room of bots) await waitForRoomPlayers(room, BOT_COUNT, "multiplayer room");
+  assert.equal(new Set(bots.map(room => room.roomId)).size, 1, "all 4 bots must share one room");
 
   // Exercise lobby leave/rejoin before the run starts.
   const reconnectingBot = bots.pop()!;
   await reconnectingBot.leave();
-  await waitForRoomPlayers(joined[0]!, BOT_COUNT - 1, "room after lobby leave");
+  await waitForRoomPlayers(bots[0]!, BOT_COUNT - 1, "room after lobby leave");
   const replacementClient = new Client(BASE_URL);
   const replacement = await replacementClient.joinById(roomId, { name: "AI-Reconnect", mapId: "neon_city" });
-  bots.push(...joined.slice(0, -1), replacement);
+  bots.push(replacement);
   await waitForRoomPlayers(replacement, BOT_COUNT, "room after lobby reconnect");
 
   for (const room of bots) room.send("ready", true);
@@ -134,7 +124,6 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   await waitForRoomPlayers(replacement, BOT_COUNT - 1, "room after active disconnect");
   assert.equal(String(replacement.state.phase), "playing", "remaining players should stay in the run");
 
-  // Health endpoint and server logs are included in failure output.
   assert.match(stdout, /Server listening on http:\/\/127\.0\.0\.1:3210/);
   assert.doesNotMatch(stderr, /EADDRINUSE|MODULE_NOT_FOUND|SyntaxError/);
 });
@@ -156,11 +145,14 @@ test("room matchmaking creates a second room when the first one is full", { time
 
   await waitForHealth();
   const clients = Array.from({ length: BOT_COUNT + 1 }, () => new Client(BASE_URL));
-  const joined = await Promise.all(clients.map((client, index) => client.joinOrCreate("game", { name: `Capacity-Bot-${index + 1}` })));
+  const joined: BotRoom[] = [];
+  for (let index = 0; index < clients.length; index += 1) {
+    joined.push(await clients[index]!.joinOrCreate("game", { name: `Capacity-Bot-${index + 1}` }));
+  }
   rooms.push(...joined);
 
-  const roomIds = joined.map(room => room.roomId);
-  assert.equal(new Set(roomIds).size, 2, "fifth matchmaking client must create/join a second room");
-  assert.ok(roomIds.filter(id => id === roomIds[0]).length <= BOT_COUNT);
+  const firstRoomId = joined[0]!.roomId;
+  assert.equal(joined.slice(0, BOT_COUNT).every(room => room.roomId === firstRoomId), true);
+  assert.notEqual(joined[BOT_COUNT]!.roomId, firstRoomId, "fifth matchmaking client must use a second room");
   assert.doesNotMatch(stderr, /EADDRINUSE|MODULE_NOT_FOUND|SyntaxError/);
 });
