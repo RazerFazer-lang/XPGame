@@ -7,8 +7,10 @@ import { GameRoom } from "./rooms/GameRoom.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "0.0.0.0";
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const webRoot = path.join(rootDir, "dist");
+// Compiled server entry: server/dist/server/src/index.js
+// Project web client:     dist/index.html
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const webRoot = path.join(projectRoot, "dist");
 const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -38,8 +40,8 @@ const httpServer = http.createServer((req, res) => {
   }
 
   if (!fs.existsSync(webRoot)) {
-    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
-    res.end("XPGame multiplayer server is running. Run `npm run build` to serve the web client.\n");
+    res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
+    res.end("XPGame server is running, but the web client build is missing. Run `npm run build`.\n");
     return;
   }
 
@@ -76,4 +78,5 @@ httpServer.listen(port, host, () => {
   console.log(`[XPGame] Server listening on http://${host}:${port}`);
   console.log(`[XPGame] Health check: http://${host}:${port}/health`);
   console.log(`[XPGame] Game + multiplayer websocket share port ${port}.`);
+  console.log(`[XPGame] Web client root: ${webRoot}`);
 });
