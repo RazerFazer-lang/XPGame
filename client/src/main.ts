@@ -5,7 +5,9 @@ import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Missing #app element");
-const serverUrl = `${location.protocol}//${location.hostname}:${import.meta.env.VITE_GAME_SERVER_PORT ?? "3000"}`;
+const serverUrl = import.meta.env.PROD
+  ? location.origin
+  : `${location.protocol}//${location.hostname}:${import.meta.env.VITE_GAME_SERVER_PORT ?? "3000"}`;
 
 app.innerHTML = `<div class="shell"><header class="topbar"><div><div class="eyebrow">XPGame // HORDE PROTOCOL</div><h1>Survive the wave.</h1></div><div id="connection" class="status">OFFLINE</div></header><section class="controls"><input id="name" maxlength="18" value="Player" aria-label="Spielername" /><button id="connect" type="button">CONNECT</button><button id="ready" type="button" disabled>READY</button></section><div id="game" class="game"></div><aside class="sidepanel"><div><span>Phase</span><strong id="phase">LOBBY</strong></div><div><span>Wave</span><strong id="wave">0</strong></div><div><span>Players</span><strong id="players">0 / ${GAME.maxPlayers}</strong></div><div><span>Level</span><strong id="level">1</strong></div><div><span>XP</span><strong id="xp">0 / 100</strong></div><div><span>HP</span><strong id="hp">100 / 100</strong></div><div><span>Kills</span><strong id="kills">0</strong></div><div class="hint">WASD bewegen · Maus zielen · Linksklick halten · Level-Ups auswählen</div></aside><div id="upgradeOverlay" class="overlay hidden" aria-live="polite"><div class="upgradePanel"><div class="eyebrow">LEVEL UP</div><h2>Choose an upgrade</h2><div id="upgradeCards" class="upgradeCards"></div></div></div><div id="gameMessage" class="gameMessage hidden"></div></div>`;
 
