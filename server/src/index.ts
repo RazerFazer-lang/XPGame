@@ -1,16 +1,12 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Server, WebSocketTransport } from "colyseus";
 import { GameRoom } from "./rooms/GameRoom.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "0.0.0.0";
-// Compiled server entry: server/dist/server/src/index.js
-// Project web client:     dist/index.html
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-const webRoot = path.join(projectRoot, "dist");
+const webRoot = path.resolve(process.cwd(), "dist");
 const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -40,8 +36,8 @@ const httpServer = http.createServer((req, res) => {
   }
 
   if (!fs.existsSync(webRoot)) {
-    res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
-    res.end("XPGame server is running, but the web client build is missing. Run `npm run build`.\n");
+    res.writeHead(503, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+    res.end("XPGame server is running, but the web client has not been built yet. Run `npm run build`.\n");
     return;
   }
 
@@ -75,8 +71,9 @@ const gameServer = new Server({
 gameServer.define("game", GameRoom);
 
 httpServer.listen(port, host, () => {
-  console.log(`[XPGame] Server listening on http://${host}:${port}`);
-  console.log(`[XPGame] Health check: http://${host}:${port}/health`);
+  console.log(`[XPGame] Server listening on 0.0.0.0:${port}`);
+  console.log(`[XPGame] Codespaces: open the forwarded port ${port} from the PORTS panel; do not open 0.0.0.0 directly.`);
+  console.log(`[XPGame] Health check: /health`);
   console.log(`[XPGame] Game + multiplayer websocket share port ${port}.`);
   console.log(`[XPGame] Web client root: ${webRoot}`);
 });
