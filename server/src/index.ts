@@ -37,8 +37,8 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Colyseus owns matchmaking routes. Leave these requests untouched so its
-  // router (bound by gameServer.listen()) can answer them.
+  // Colyseus owns matchmaking routes. Its router is registered by
+  // gameServer.serverless(); this listener must not answer these requests.
   if (pathname === "/matchmake" || pathname.startsWith("/matchmake/") || pathname === "/rooms" || pathname.startsWith("/rooms/")) {
     return;
   }
@@ -78,14 +78,28 @@ const gameServer = new Server({
 
 gameServer.define("game", GameRoom);
 
-void gameServer.listen(port, host).then(() => {
+async function startServer(): Promise<void> {
+  // Prepare Colyseus matchmaking + HTTP routing without taking ownership of
+  // the port. This also pre-reads request bodies for /matchmake POSTs.
+  await gameServer.serverless();
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => reject(error);
+    httpServer.once("error", onError);
+    httpServer.listen(port, host, () => {
+      httpServer.off("error", onError);
+      resolve();
+    });
+  });
+
   console.log(`[XPGame] Server listening on ${host}:${port}`);
   console.log(`[XPGame] Codespaces: open the forwarded port ${port} from the PORTS panel; do not open 0.0.0.0 directly.`);
   console.log(`[XPGame] Health check: /health`);
   console.log(`[XPGame] Matchmaking: /matchmake/*`);
   console.log(`[XPGame] Game + multiplayer websocket share port ${port}.`);
   console.log(`[XPGame] Web client root: ${webRoot}`);
-}).catch(error => {
+}
+
+void startServer().catch(error => {
   console.error("[XPGame] Failed to start server:", error);
   process.exitCode = 1;
 });
