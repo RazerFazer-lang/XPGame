@@ -22,11 +22,14 @@ test("upgrade choices are unique", () => {
   assert.equal(new Set(choices.map((choice) => choice.id)).size, choices.length);
 });
 
-test("upgrade application is server-side and non-repeatable", () => {
+test("upgrades can stack and are applied server-side", () => {
   const player = new PlayerState();
   const before = player.damage;
 
   assert.equal(applyUpgrade(player, "heavy_bullets"), true);
-  assert.ok(player.damage > before);
-  assert.equal(applyUpgrade(player, "heavy_bullets"), false);
+  const afterFirst = player.damage;
+  assert.ok(afterFirst > before);
+
+  assert.equal(applyUpgrade(player, "heavy_bullets"), true);
+  assert.ok(player.damage > afterFirst);
 });
