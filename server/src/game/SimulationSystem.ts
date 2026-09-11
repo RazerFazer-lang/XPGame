@@ -25,9 +25,10 @@ export function simulateCombat(state: GameState, deltaMs: number): void {
     if (target) {
       moveEnemyTowardPlayer(enemy, target, dt);
       const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
-      if (distance <= enemy.radius + 20) {
-        const raw = enemy.damage * dt;
-        target.hp = Math.max(0, target.hp - Math.max(1, raw - target.armor * 0.15 * dt));
+      const attackRange = enemy.kind === "ranged" ? 280 : enemy.radius + 20;
+      if (distance <= attackRange) {
+        const mitigatedDamagePerSecond = Math.max(0, enemy.damage - target.armor);
+        target.hp = Math.max(0, target.hp - mitigatedDamagePerSecond * dt);
       }
     }
     if (enemy.x < -200 || enemy.x > 2120 || enemy.y < -200 || enemy.y > 1280) { state.enemies.delete(id); continue; }
