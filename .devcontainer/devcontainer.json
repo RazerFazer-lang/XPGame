@@ -14,5 +14,5 @@
     "onAutoForward": "silent"
   },
   "postCreateCommand": "npm install",
-  "postStartCommand": "npm run build && nohup npm start > /tmp/xpgame-server.log 2>&1 &"
+  "postStartCommand": "bash .devcontainer/start-game.sh"
 }
