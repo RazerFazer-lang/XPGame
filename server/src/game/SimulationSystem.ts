@@ -28,7 +28,6 @@ function applyDownedState(state: GameState, player: PlayerState, damage: number)
 
 function updatePlayers(state: GameState, deltaMs: number): void {
   // A nearby teammate gets the first chance to revive a downed player.
-  // Automatic respawn only happens after the full downed timer expires.
   for (const reviver of state.players.values()) {
     if (reviver.downed || reviver.hp <= 0) continue;
     for (const target of state.players.values()) {
@@ -38,7 +37,8 @@ function updatePlayers(state: GameState, deltaMs: number): void {
         if (target.respawnMs <= 0) {
           target.downed = false;
           target.hp = Math.ceil(target.maxHp * 0.45);
-          target.revives += 1;
+          reviver.revives += 1;
+          target.respawnMs = 0;
           reviver.score += 100;
         }
       }
