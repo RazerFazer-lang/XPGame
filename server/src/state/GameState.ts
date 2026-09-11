@@ -27,6 +27,7 @@ export class PlayerState extends Schema {
   @type("number") critMultiplier = 1.75;
   @type("string") upgradeChoices = "[]";
   @type("string") upgrades = "[]";
+  @type("number") pendingUpgradeLevels = 0;
 }
 
 export class EnemyState extends Schema {
