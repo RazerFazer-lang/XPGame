@@ -2,6 +2,7 @@ import { GameState, PlayerState } from "../state/GameState.js";
 import { addPlayerXp, addLoot, addXpDrop, moveEnemyTowardPlayer } from "./CombatSystem.js";
 
 const CELL_SIZE = 120;
+const GAME_RESPAWN_MS = 7000;
 
 function nearestLivingPlayer(state: GameState, x: number, y: number): PlayerState | undefined {
   let target: PlayerState | undefined;
@@ -25,20 +26,9 @@ function applyDownedState(state: GameState, player: PlayerState, damage: number)
   player.lives = Math.max(0, player.lives - 1);
 }
 
-const GAME_RESPAWN_MS = 7000;
-
 function updatePlayers(state: GameState, deltaMs: number): void {
-  for (const player of state.players.values()) {
-    if (!player.downed) continue;
-    player.respawnMs = Math.max(0, player.respawnMs - deltaMs);
-    if (player.respawnMs <= 0 && player.lives > 0) {
-      player.downed = false;
-      player.hp = player.maxHp;
-      player.x = 960;
-      player.y = 540;
-    }
-  }
-
+  // A nearby teammate gets the first chance to revive a downed player.
+  // Automatic respawn only happens after the full downed timer expires.
   for (const reviver of state.players.values()) {
     if (reviver.downed || reviver.hp <= 0) continue;
     for (const target of state.players.values()) {
@@ -52,6 +42,17 @@ function updatePlayers(state: GameState, deltaMs: number): void {
           reviver.score += 100;
         }
       }
+    }
+  }
+
+  for (const player of state.players.values()) {
+    if (!player.downed) continue;
+    player.respawnMs = Math.max(0, player.respawnMs - deltaMs);
+    if (player.respawnMs <= 0 && player.lives > 0) {
+      player.downed = false;
+      player.hp = player.maxHp;
+      player.x = 960;
+      player.y = 540;
     }
   }
 }
