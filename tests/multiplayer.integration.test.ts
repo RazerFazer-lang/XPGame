@@ -48,6 +48,27 @@ function startServer(port: number): ChildProcess {
   });
 }
 
+async function diagnoseJoinFailure(baseUrl: string, label: string, error: unknown, stdout: string, stderr: string): Promise<never> {
+  let probe = "probe failed before receiving a response";
+  try {
+    const response = await fetch(`${baseUrl}/matchmake/joinOrCreate/game`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ name: "HTTP-Probe", mapId: "neon_city" }),
+    });
+    probe = `HTTP ${response.status}: ${await response.text()}`;
+  } catch (probeError) {
+    probe = `HTTP probe error: ${probeError instanceof Error ? probeError.stack ?? probeError.message : String(probeError)}`;
+  }
+
+  throw new Error([
+    `${label} failed: ${error instanceof Error ? error.stack ?? error.message : String(error)}`,
+    `Direct matchmaking probe: ${probe}`,
+    `Server stdout:\n${stdout || "<empty>"}`,
+    `Server stderr:\n${stderr || "<empty>"}`,
+  ].join("\n\n"));
+}
+
 async function waitForRoomPlayers(room: BotRoom, expected: number, label: string): Promise<void> {
   await waitFor(`${label} to have ${expected} players`, () => Number(room.state?.players?.size ?? 0) === expected, 10_000);
 }
@@ -80,7 +101,11 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   // Bot 1 creates the lobby; bots 2-4 use normal quick-match matchmaking.
   for (let index = 0; index < BOT_COUNT; index += 1) {
     const client = new Client(baseUrl);
-    bots.push(await client.joinOrCreate("game", { name: `AI-Bot-${index + 1}`, mapId: "neon_city" }));
+    try {
+      bots.push(await client.joinOrCreate("game", { name: `AI-Bot-${index + 1}`, mapId: "neon_city" }));
+    } catch (error) {
+      await diagnoseJoinFailure(baseUrl, `AI-Bot-${index + 1} joinOrCreate`, error, stdout, stderr);
+    }
   }
 
   const roomId = bots[0]!.roomId;
@@ -93,13 +118,18 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   await reconnectingBot.leave();
   await waitForRoomPlayers(bots[0]!, BOT_COUNT - 1, "room after lobby leave");
   const replacementClient = new Client(baseUrl);
-  const replacement = await replacementClient.joinOrCreate("game", { name: "AI-Reconnect", mapId: "neon_city" });
-  bots.push(replacement);
-  assert.equal(replacement.roomId, roomId, "quick-match reconnect should reuse the open lobby room");
-  await waitForRoomPlayers(replacement, BOT_COUNT, "room after lobby reconnect");
+  let replacement: BotRoom;
+  try {
+    replacement = await replacementClient.joinOrCreate("game", { name: "AI-Reconnect", mapId: "neon_city" });
+  } catch (error) {
+    await diagnoseJoinFailure(baseUrl, "AI-Reconnect joinOrCreate", error, stdout, stderr);
+  }
+  bots.push(replacement!);
+  assert.equal(replacement!.roomId, roomId, "quick-match reconnect should reuse the open lobby room");
+  await waitForRoomPlayers(replacement!, BOT_COUNT, "room after lobby reconnect");
 
   for (const room of bots) room.send("ready", true);
-  await waitForPhase(replacement, "playing", "multiplayer room");
+  await waitForPhase(replacement!, "playing", "multiplayer room");
 
   // Simulate four independent AI players sending authoritative input/aim/fire.
   for (let tick = 0; tick < 12; tick += 1) {
@@ -112,15 +142,15 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   }
 
   await sleep(500);
-  assert.equal(replacement.state.players.size, BOT_COUNT, "all bot states must remain synchronized");
-  assert.equal(String(replacement.state.phase), "playing");
-  assert.ok(Number(replacement.state.wave) >= 1);
+  assert.equal(replacement!.state.players.size, BOT_COUNT, "all bot states must remain synchronized");
+  assert.equal(String(replacement!.state.phase), "playing");
+  assert.ok(Number(replacement!.state.wave) >= 1);
 
   // Validate that a bot can disconnect cleanly and the others keep the room alive.
   const leavingBot = bots.pop()!;
   await leavingBot.leave();
-  await waitForRoomPlayers(replacement, BOT_COUNT - 1, "room after active disconnect");
-  assert.equal(String(replacement.state.phase), "playing", "remaining players should stay in the run");
+  await waitForRoomPlayers(replacement!, BOT_COUNT - 1, "room after active disconnect");
+  assert.equal(String(replacement!.state.phase), "playing", "remaining players should stay in the run");
 
   assert.match(stdout, new RegExp(`Server listening on 127\\.0\\.0\\.1:${port}`));
   assert.doesNotMatch(stderr, /EADDRINUSE|MODULE_NOT_FOUND|SyntaxError/);
@@ -131,7 +161,9 @@ test("room matchmaking creates a second room when the first one is full", { time
   const baseUrl = `http://127.0.0.1:${port}`;
   const server = startServer(port);
   const rooms: BotRoom[] = [];
+  let stdout = "";
   let stderr = "";
+  server.stdout?.on("data", chunk => { stdout += String(chunk); });
   server.stderr?.on("data", chunk => { stderr += String(chunk); });
 
   t.after(async () => {
@@ -147,7 +179,11 @@ test("room matchmaking creates a second room when the first one is full", { time
   const clients = Array.from({ length: BOT_COUNT + 1 }, () => new Client(baseUrl));
   const joined: BotRoom[] = [];
   for (let index = 0; index < clients.length; index += 1) {
-    joined.push(await clients[index]!.joinOrCreate("game", { name: `Capacity-Bot-${index + 1}` }));
+    try {
+      joined.push(await clients[index]!.joinOrCreate("game", { name: `Capacity-Bot-${index + 1}` }));
+    } catch (error) {
+      await diagnoseJoinFailure(baseUrl, `Capacity-Bot-${index + 1} joinOrCreate`, error, stdout, stderr);
+    }
   }
   rooms.push(...joined);
 
