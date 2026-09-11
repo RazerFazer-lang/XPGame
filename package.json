@@ -12,7 +12,7 @@
     "dev:client": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "start": "node server/dist/index.js",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "tsx --tsconfig tsconfig.server.json --test tests/*.test.ts",
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
