@@ -23,20 +23,26 @@ export const UPGRADES: UpgradeDefinition[] = [
   { id: "overclock", title: "Overclock", description: "18% faster attacks and +8% damage", rarity: "Epic", apply: p => { p.attackCooldownMs *= 0.82; p.damage *= 1.08; } },
 ];
 
-export function getUpgradeChoices(player: PlayerState, count = 3): UpgradeDefinition[] {
-  const owned = new Set<string>(JSON.parse(player.upgrades || "[]") as string[]);
-  const pool = UPGRADES.filter(u => !owned.has(u.id));
-  const result = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
-  return result.length ? result : UPGRADES.slice(0, count);
+function readOwned(player: PlayerState): string[] {
+  try {
+    const parsed = JSON.parse(player.upgrades || "[]");
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getUpgradeChoices(_player: PlayerState, count = 3): UpgradeDefinition[] {
+  const safeCount = Math.max(1, Math.min(5, Math.floor(count)));
+  return [...UPGRADES].sort(() => Math.random() - 0.5).slice(0, safeCount);
 }
 
 export function applyUpgrade(player: PlayerState, id: string): boolean {
   const upgrade = UPGRADES.find(u => u.id === id);
   if (!upgrade) return false;
-  const current = new Set<string>(JSON.parse(player.upgrades || "[]") as string[]);
-  if (current.has(id)) return false;
+  const current = readOwned(player);
   upgrade.apply(player);
-  current.add(id);
-  player.upgrades = JSON.stringify([...current]);
+  current.push(id);
+  player.upgrades = JSON.stringify(current);
   return true;
 }
