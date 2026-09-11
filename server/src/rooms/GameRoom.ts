@@ -34,7 +34,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
     this.onMessage("chooseUpgrade", (client, id: string) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || !id || player.upgradeChoices === "[]") return;
+      if (!player || !id || player.upgradeChoices === "[]" || player.upgradeChoices === "pending") return;
       let choices: string[];
       try {
         choices = JSON.parse(player.upgradeChoices || "[]") as string[];
@@ -42,7 +42,9 @@ export class GameRoom extends Room<{ state: GameState }> {
         return;
       }
       if (!choices.includes(id)) return;
-      if (applyUpgrade(player, id)) player.upgradeChoices = "[]";
+      if (!applyUpgrade(player, id)) return;
+      player.pendingUpgradeLevels = Math.max(0, player.pendingUpgradeLevels - 1);
+      player.upgradeChoices = player.pendingUpgradeLevels > 0 ? "pending" : "[]";
     });
 
     this.onMessage("input", (client, message: InputMessage) => {
