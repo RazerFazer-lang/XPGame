@@ -1,1 +1,1 @@
-{"extends":"./tsconfig.json","compilerOptions":{"composite":true,"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","lib":["ES2022"],"outDir":"server/dist","rootDir":".","declaration":true},"include":["server/src/**/*.ts","shared/src/**/*.ts"]}
+{"extends":"./tsconfig.json","compilerOptions":{"composite":true,"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","lib":["ES2022"],"outDir":"server/dist","rootDir":".","declaration":true,"experimentalDecorators":true},"include":["server/src/**/*.ts","shared/src/**/*.ts"]}
