@@ -6,7 +6,7 @@
     "3000": {
       "label": "XPGame – direkt spielen",
       "protocol": "http",
-      "onAutoForward": "openBrowser",
+      "onAutoForward": "notify",
       "visibility": "public"
     }
   },
