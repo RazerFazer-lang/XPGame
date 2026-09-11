@@ -44,11 +44,11 @@ const gameServer = new Server({
   express: (app) => {
     app.disable("x-powered-by");
 
-    app.get("/health", (_req, res) => {
+    app.get("/health", (_req: any, res: any) => {
       res.set("cache-control", "no-store").json({ ok: true, service: "XPGame", multiplayer: true });
     });
 
-    app.get("/", (_req, res) => {
+    app.get("/", (_req: any, res: any) => {
       if (!fs.existsSync(webRoot)) {
         res.status(503).type("text/plain").send("XPGame server is running, but the web client has not been built yet. Run `npm run build`.\n");
         return;
@@ -56,7 +56,7 @@ const gameServer = new Server({
       sendFile(res, path.join(webRoot, "index.html"), "no-cache");
     });
 
-    app.get(/^\/assets\/(.+)$/, (req, res) => {
+    app.get(/^\/assets\/(.+)$/, (req: any, res: any) => {
       const relative = decodeURIComponent(String(req.params[0] ?? ""));
       const candidate = path.resolve(webRoot, "assets", relative);
       if (!candidate.startsWith(path.join(webRoot, "assets") + path.sep)) {
@@ -66,7 +66,7 @@ const gameServer = new Server({
       sendFile(res, candidate, "public, max-age=31536000, immutable");
     });
 
-    app.get("/favicon.ico", (_req, res) => {
+    app.get("/favicon.ico", (_req: any, res: any) => {
       sendFile(res, path.join(webRoot, "favicon.ico"), "public, max-age=31536000, immutable");
     });
   },
