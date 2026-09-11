@@ -1,0 +1,14 @@
+{
+  "name": "XPGame Multiplayer",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "XPGame multiplayer",
+      "protocol": "http",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm install",
+  "postStartCommand": "npm run build && npm start"
+}
