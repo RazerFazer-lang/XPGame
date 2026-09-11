@@ -64,7 +64,11 @@ export function simulateCombat(state: GameState, deltaMs: number): void {
     for (const player of state.players.values()) {
       if (player.hp <= 0) continue;
       if (Math.hypot(player.x - drop.x, player.y - drop.y) <= player.pickupRadius) {
-        if (addPlayerXp(player, drop.value)) player.upgradeChoices = "pending";
+        const previousLevel = player.level;
+        if (addPlayerXp(player, drop.value)) {
+          player.pendingUpgradeLevels += player.level - previousLevel;
+          if (player.upgradeChoices === "[]") player.upgradeChoices = "pending";
+        }
         collected = true; break;
       }
     }
