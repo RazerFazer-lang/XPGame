@@ -32,9 +32,17 @@ function readOwned(player: PlayerState): string[] {
   }
 }
 
+function shuffle<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
 export function getUpgradeChoices(_player: PlayerState, count = 3): UpgradeDefinition[] {
   const safeCount = Math.max(1, Math.min(5, Math.floor(count)));
-  return [...UPGRADES].sort(() => Math.random() - 0.5).slice(0, safeCount);
+  return shuffle([...UPGRADES]).slice(0, safeCount);
 }
 
 export function applyUpgrade(player: PlayerState, id: string): boolean {
