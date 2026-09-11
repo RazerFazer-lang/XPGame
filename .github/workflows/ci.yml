@@ -19,6 +19,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Multiplayer integration - multi-bot connection test
+        run: npm run test:integration
       - name: Smoke test multiplayer server
         shell: bash
         run: |
