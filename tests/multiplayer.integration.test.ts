@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { Client } from "@colyseus/sdk";
 
-const PORT = 3210;
-const BASE_URL = `http://127.0.0.1:${PORT}`;
 const BOT_COUNT = 4;
 
 type BotRoom = Awaited<ReturnType<Client["joinOrCreate"]>>;
@@ -21,12 +19,12 @@ async function waitFor(label: string, predicate: () => boolean, timeoutMs = 10_0
   }
 }
 
-async function waitForHealth(): Promise<void> {
+async function waitForHealth(baseUrl: string): Promise<void> {
   const started = Date.now();
   let lastError = "unknown";
   while (Date.now() - started < 15_000) {
     try {
-      const response = await fetch(`${BASE_URL}/health`);
+      const response = await fetch(`${baseUrl}/health`);
       if (response.ok) {
         const body = await response.json() as { ok?: boolean; multiplayer?: boolean };
         if (body.ok === true && body.multiplayer === true) return;
@@ -42,10 +40,10 @@ async function waitForHealth(): Promise<void> {
   throw new Error(`Server health check failed: ${lastError}`);
 }
 
-function startServer(): ChildProcess {
+function startServer(port: number): ChildProcess {
   return spawn(process.execPath, ["server/dist/server/src/index.js"], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(PORT), HOST: "127.0.0.1" },
+    env: { ...process.env, PORT: String(port), HOST: "127.0.0.1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
@@ -59,7 +57,9 @@ async function waitForPhase(room: BotRoom, expected: string, label: string): Pro
 }
 
 test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect", { timeout: 45_000 }, async t => {
-  const server = startServer();
+  const port = 3210;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = startServer(port);
   const bots: BotRoom[] = [];
   let stdout = "";
   let stderr = "";
@@ -75,29 +75,27 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
     if (!server.killed) server.kill("SIGKILL");
   });
 
-  await waitForHealth();
+  await waitForHealth(baseUrl);
 
-  // Bot 1 creates the lobby; bots 2-4 explicitly join the same room.
-  const firstClient = new Client(BASE_URL);
-  const first = await firstClient.joinOrCreate("game", { name: "AI-Bot-1", mapId: "neon_city" });
-  bots.push(first);
-  const roomId = first.roomId;
-
-  for (let index = 1; index < BOT_COUNT; index += 1) {
-    const client = new Client(BASE_URL);
-    bots.push(await client.joinById(roomId, { name: `AI-Bot-${index + 1}`, mapId: "neon_city" }));
+  // Bot 1 creates the lobby; bots 2-4 use normal quick-match matchmaking.
+  for (let index = 0; index < BOT_COUNT; index += 1) {
+    const client = new Client(baseUrl);
+    bots.push(await client.joinOrCreate("game", { name: `AI-Bot-${index + 1}`, mapId: "neon_city" }));
   }
 
-  for (const room of bots) await waitForRoomPlayers(room, BOT_COUNT, "multiplayer room");
+  const roomId = bots[0]!.roomId;
   assert.equal(new Set(bots.map(room => room.roomId)).size, 1, "all 4 bots must share one room");
+  assert.equal(roomId.length > 0, true);
+  for (const room of bots) await waitForRoomPlayers(room, BOT_COUNT, "multiplayer room");
 
   // Exercise lobby leave/rejoin before the run starts.
   const reconnectingBot = bots.pop()!;
   await reconnectingBot.leave();
   await waitForRoomPlayers(bots[0]!, BOT_COUNT - 1, "room after lobby leave");
-  const replacementClient = new Client(BASE_URL);
-  const replacement = await replacementClient.joinById(roomId, { name: "AI-Reconnect", mapId: "neon_city" });
+  const replacementClient = new Client(baseUrl);
+  const replacement = await replacementClient.joinOrCreate("game", { name: "AI-Reconnect", mapId: "neon_city" });
   bots.push(replacement);
+  assert.equal(replacement.roomId, roomId, "quick-match reconnect should reuse the open lobby room");
   await waitForRoomPlayers(replacement, BOT_COUNT, "room after lobby reconnect");
 
   for (const room of bots) room.send("ready", true);
@@ -124,12 +122,14 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   await waitForRoomPlayers(replacement, BOT_COUNT - 1, "room after active disconnect");
   assert.equal(String(replacement.state.phase), "playing", "remaining players should stay in the run");
 
-  assert.match(stdout, /Server listening on http:\/\/127\.0\.0\.1:3210/);
+  assert.match(stdout, new RegExp(`Server listening on 127\\.0\\.0\\.1:${port}`));
   assert.doesNotMatch(stderr, /EADDRINUSE|MODULE_NOT_FOUND|SyntaxError/);
 });
 
 test("room matchmaking creates a second room when the first one is full", { timeout: 30_000 }, async t => {
-  const server = startServer();
+  const port = 3211;
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const server = startServer(port);
   const rooms: BotRoom[] = [];
   let stderr = "";
   server.stderr?.on("data", chunk => { stderr += String(chunk); });
@@ -143,8 +143,8 @@ test("room matchmaking creates a second room when the first one is full", { time
     if (!server.killed) server.kill("SIGKILL");
   });
 
-  await waitForHealth();
-  const clients = Array.from({ length: BOT_COUNT + 1 }, () => new Client(BASE_URL));
+  await waitForHealth(baseUrl);
+  const clients = Array.from({ length: BOT_COUNT + 1 }, () => new Client(baseUrl));
   const joined: BotRoom[] = [];
   for (let index = 0; index < clients.length; index += 1) {
     joined.push(await clients[index]!.joinOrCreate("game", { name: `Capacity-Bot-${index + 1}` }));
