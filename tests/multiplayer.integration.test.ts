@@ -146,8 +146,9 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   assert.equal(String(replacement!.state.phase), "playing");
   assert.ok(Number(replacement!.state.wave) >= 1);
 
-  // Validate that a bot can disconnect cleanly and the others keep the room alive.
-  const leavingBot = bots.pop()!;
+  // Disconnect a different bot than the observer so the observer remains subscribed to state updates.
+  const leavingBot = bots[0]!;
+  bots.splice(0, 1);
   await leavingBot.leave();
   await waitForRoomPlayers(replacement!, BOT_COUNT - 1, "room after active disconnect");
   assert.equal(String(replacement!.state.phase), "playing", "remaining players should stay in the run");
