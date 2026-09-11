@@ -33,7 +33,34 @@ let room: any = null; let localSessionId = ""; let ready = false; let lastUpgrad
 const upgradeCatalog: Record<string, { title: string; description: string; rarity: string }> = { heavy_bullets: { title: "Heavy Bullets", description: "+20% damage", rarity: "COMMON" }, rapid_fire: { title: "Rapid Fire", description: "12% faster attacks", rarity: "COMMON" }, twin_shot: { title: "Twin Shot", description: "+1 projectile", rarity: "UNCOMMON" }, piercing: { title: "Piercing", description: "+1 pierce", rarity: "UNCOMMON" }, velocity: { title: "Velocity", description: "+20% projectile speed", rarity: "COMMON" }, adrenaline: { title: "Adrenaline", description: "+15% movement speed", rarity: "COMMON" }, magnet: { title: "Magnet", description: "+45 pickup radius", rarity: "COMMON" }, vitality: { title: "Vitality", description: "+25 max HP and heal", rarity: "COMMON" }, armor: { title: "Armor Plating", description: "Reduce incoming damage", rarity: "UNCOMMON" }, critical: { title: "Critical Strike", description: "+8% crit chance", rarity: "RARE" }, deadeye: { title: "Deadeye", description: "+35% crit damage", rarity: "RARE" }, overclock: { title: "Overclock", description: "18% faster attacks and +8% damage", rarity: "EPIC" } };
 function beep(frequency: number, duration = .06, type: OscillatorType = "square") { if (muteInput.checked) return; try { audioContext ??= new AudioContext(); const osc = audioContext.createOscillator(); const gain = audioContext.createGain(); osc.type = type; osc.frequency.value = frequency; gain.gain.setValueAtTime(.03, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audioContext.currentTime + duration); osc.connect(gain).connect(audioContext.destination); osc.start(); osc.stop(audioContext.currentTime + duration); } catch {} }
 function showMessage(text: string) { messageEl.textContent = text; messageEl.classList.remove("hidden"); window.setTimeout(() => messageEl.classList.add("hidden"), 1800); }
-function saveMeta(state: any) { const local = state.players.get(localSessionId); if (!local) return; const current = JSON.parse(localStorage.getItem("xpgameMeta") || '{"victories":0,"bestWave":0,"bestKills":0,"coins":0}') as Record<string, number>; current.coins = Math.max(current.coins ?? 0, Number(local.coins ?? 0)); current.bestWave = Math.max(current.bestWave ?? 0, Number(state.wave ?? 0)); current.bestKills = Math.max(current.bestKills ?? 0, Number(local.kills ?? 0)); localStorage.setItem("xpgameMeta", JSON.stringify(current)); }
+function saveMeta(state: any) {
+  const local = state.players.get(localSessionId);
+  if (!local) return;
+  const defaults = { victories: 0, bestWave: 0, bestKills: 0, coins: 0 };
+  let current = defaults;
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem("xpgameMeta") || "{}");
+    if (typeof parsed === "object" && parsed !== null) {
+      const values = parsed as Record<string, unknown>;
+      current = {
+        victories: Number.isFinite(Number(values.victories)) ? Number(values.victories) : defaults.victories,
+        bestWave: Number.isFinite(Number(values.bestWave)) ? Number(values.bestWave) : defaults.bestWave,
+        bestKills: Number.isFinite(Number(values.bestKills)) ? Number(values.bestKills) : defaults.bestKills,
+        coins: Number.isFinite(Number(values.coins)) ? Number(values.coins) : defaults.coins,
+      };
+    }
+  } catch {
+    current = defaults;
+  }
+  current.coins = Math.max(current.coins, Number(local.coins ?? 0));
+  current.bestWave = Math.max(current.bestWave, Number(state.wave ?? 0));
+  current.bestKills = Math.max(current.bestKills, Number(local.kills ?? 0));
+  try {
+    localStorage.setItem("xpgameMeta", JSON.stringify(current));
+  } catch {
+    // Storage can be unavailable in private browsing; gameplay remains online.
+  }
+}
 
 class MainScene extends Phaser.Scene {
   private players = new Map<string, Phaser.GameObjects.Arc>(); private enemies = new Map<string, Phaser.GameObjects.Arc>(); private projectiles = new Map<string, Phaser.GameObjects.Arc>(); private xpDrops = new Map<string, Phaser.GameObjects.Arc>(); private loot = new Map<string, Phaser.GameObjects.Arc>(); private particles = new Set<Phaser.GameObjects.GameObject>();
@@ -46,6 +73,14 @@ class MainScene extends Phaser.Scene {
     this.syncMap(state.xpDrops, this.xpDrops, (_id: string, drop: any) => this.add.circle(drop.x, drop.y, 6, 0x22d3ee));
     this.syncMap(state.loot, this.loot, (_id: string, drop: any) => { const c = this.add.circle(drop.x, drop.y, drop.kind === "weapon" ? 9 : 7, drop.kind === "weapon" ? 0xe879f9 : 0xfacc15); c.setStrokeStyle(2, 0xffffff, .9); return c; });
     for (const p of this.particles) if (!(p as any).active) this.particles.delete(p);
+  }
+  clearEntities() {
+    for (const collection of [this.players, this.enemies, this.projectiles, this.xpDrops, this.loot]) {
+      for (const marker of collection.values()) marker.destroy();
+      collection.clear();
+    }
+    for (const particle of this.particles) particle.destroy();
+    this.particles.clear();
   }
   burst(x: number, y: number, size = 20) { if (!particlesInput.checked) return; for (let i = 0; i < 5; i += 1) { const c = this.add.circle(x, y, 2 + Math.random() * 4, 0xffffff, .9); this.particles.add(c); this.tweens.add({ targets: c, x: x + (Math.random() - .5) * size, y: y + (Math.random() - .5) * size, alpha: 0, duration: 220 + Math.random() * 180, onComplete: () => c.destroy() }); } }
   private syncMap<T extends Phaser.GameObjects.GameObject>(source: any, target: Map<string, T>, create: (id: string, data: any) => T) { const seen = new Set<string>(); source.forEach((data: any, id: string) => { seen.add(id); let marker = target.get(id); if (!marker) { marker = create(id, data); target.set(id, marker); } (marker as any).setPosition(data.x, data.y); }); for (const [id, marker] of target) { if (!seen.has(id)) { marker.destroy(); target.delete(id); } } }
@@ -77,7 +112,7 @@ async function join(mode: "quick" | "room") {
       const scene = game.scene.getScene("main") as MainScene; scene.sync(state);
       if (state.event) scene.burst(GAME.width / 2, 90, 90);
     });
-    room.onLeave((code: number) => { firing = false; lastPhase = ""; lastUpgradeSignature = ""; ready = false; readyButton.textContent = "READY"; connectionEl.textContent = `DISCONNECTED ${code || ""}`.trim(); connectButton.disabled = false; joinButton.disabled = false; readyButton.disabled = true; room = null; overlay.classList.add("hidden"); showMessage(`DISCONNECTED${code ? ` (${code})` : ""}`); });
+    room.onLeave((code: number) => { firing = false; lastPhase = ""; lastUpgradeSignature = ""; ready = false; readyButton.textContent = "READY"; connectionEl.textContent = `DISCONNECTED ${code || ""}`.trim(); connectButton.disabled = false; joinButton.disabled = false; readyButton.disabled = true; room = null; overlay.classList.add("hidden"); (game.scene.getScene("main") as MainScene).clearEntities(); showMessage(`DISCONNECTED${code ? ` (${code})` : ""}`); });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error("[XPGame] connection failed", { serverUrl, error });

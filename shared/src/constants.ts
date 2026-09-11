@@ -15,6 +15,10 @@ export const GAME = {
   reviveRange: 90,
   reviveMs: 2500,
   eventIntervalMs: 45000,
+  maxInputMagnitude: 1,
+  maxMessageRate: 60,
+  maxEnemies: 260,
+  maxProjectiles: 1200,
 } as const;
 
 export const WAVE = {

@@ -113,6 +113,16 @@ test("real multiplayer integration: 4 AI bots connect, sync, play and disconnect
   assert.equal(roomId.length > 0, true);
   for (const room of bots) await waitForRoomPlayers(room, BOT_COUNT, "multiplayer room");
 
+  // Malformed payloads must be ignored without mutating the lobby or crashing the room.
+  bots[0]!.send("ready", "true");
+  bots[0]!.send("input", null);
+  bots[0]!.send("aim", []);
+  bots[0]!.send("weapon", 42);
+  bots[0]!.send("chooseUpgrade", {});
+  await sleep(100);
+  assert.equal(String(bots[0]!.state.phase), "lobby");
+  assert.equal(bots[0]!.state.players.get(bots[0]!.sessionId)?.ready, false);
+
   // Exercise lobby leave/rejoin before the run starts.
   const reconnectingBot = bots.pop()!;
   await reconnectingBot.leave();

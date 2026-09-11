@@ -14,6 +14,7 @@ export class PlayerState extends Schema {
   @type("boolean") ready = false;
   @type("boolean") downed = false;
   @type("number") respawnMs = 0;
+  @type("number") reviveTimerMs = 0;
   @type("number") lives = 3;
   @type("number") aimX = 1;
   @type("number") aimY = 0;

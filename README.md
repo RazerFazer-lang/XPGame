@@ -38,6 +38,10 @@ Then open `http://localhost:3000`.
 
 The game supports up to four players in an authoritative Colyseus room. The browser client supports quick matchmaking plus direct room-code joining, lobby ready state, map and weapon selection, reconnect cleanup, server-authoritative movement, mouse aim and server-side fire cooldowns.
 
+All gameplay messages are validated on the server. Invalid payloads, non-finite
+coordinates, unsupported weapons/maps, and over-capacity entity creation are
+ignored without changing authoritative state.
+
 ## Gameplay systems
 
 - Downed state, lives, automatic respawn and co-op revive
@@ -71,6 +75,21 @@ Run state is authoritative on the game server. Meta statistics currently persist
 npm run typecheck
 npm test
 npm run build
+npm run test:integration
 ```
 
-GitHub Actions runs these checks on pushes and pull requests.
+`npm run test:integration` starts an isolated server and exercises four real
+Colyseus clients, lobby leave/rejoin, malformed messages, active disconnect,
+and room-capacity matchmaking. GitHub Actions runs these checks plus a
+production health smoke test on pushes and pull requests.
+
+## Troubleshooting
+
+- **Server not starting / port in use:** set `PORT` and optionally `HOST`
+  before `npm start` (the default is `0.0.0.0:3000`).
+- **Connection or matchmaking error:** verify `GET /health` first, then use
+  the same forwarded host and port for the browser client and WebSocket.
+- **Room full:** quick matchmaking creates another room once four players
+  occupy the current lobby; direct room-code joins must use an open lobby.
+- **Codespaces or Hamachi:** forward/expose port 3000 and connect through the
+  host's reachable IP rather than `localhost`.
