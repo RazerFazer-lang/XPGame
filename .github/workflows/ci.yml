@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node server/dist/index.js > /tmp/xpgame-ci-server.log 2>&1 &
+          npm start > /tmp/xpgame-ci-server.log 2>&1 &
           server_pid=$!
           trap 'kill $server_pid 2>/dev/null || true' EXIT
           for _ in $(seq 1 30); do
