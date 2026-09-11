@@ -15,16 +15,17 @@ export class GameRoom extends Room<{ state: GameState }> {
   private enemyId = 0;
   private projectileId = 0;
   private bossWaveSpawned = new Set<number>();
+  private lastInputAt = new Map<string, number>();
 
   onCreate() {
     this.autoDispose = true;
 
     this.onMessage("ready", (client, ready: boolean) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || this.state.phase === "game_over") return;
+      if (!player || this.state.phase !== "lobby") return;
       player.ready = Boolean(ready);
       const players = Array.from(this.state.players.values());
-      if (this.state.phase === "lobby" && players.length > 0 && players.every(p => p.ready)) {
+      if (players.length > 0 && players.every(p => p.ready)) {
         this.state.phase = "playing";
         this.state.wave = 1;
         this.state.elapsedMs = 0;
@@ -50,25 +51,41 @@ export class GameRoom extends Room<{ state: GameState }> {
     this.onMessage("input", (client, message: InputMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || this.state.phase !== "playing" || player.hp <= 0) return;
-      const dx = Math.max(-1, Math.min(1, Number(message?.dx ?? 0)));
-      const dy = Math.max(-1, Math.min(1, Number(message?.dy ?? 0)));
+
+      const now = Date.now();
+      const previous = this.lastInputAt.get(client.sessionId);
+      const elapsedSeconds = previous === undefined ? 1 / GAME.serverHz : Math.max(0, Math.min(0.1, (now - previous) / 1000));
+      if (elapsedSeconds < 1 / (GAME.serverHz * 2)) return;
+      this.lastInputAt.set(client.sessionId, now);
+
+      const rawDx = Number(message?.dx ?? 0);
+      const rawDy = Number(message?.dy ?? 0);
+      const dx = Number.isFinite(rawDx) ? Math.max(-1, Math.min(1, rawDx)) : 0;
+      const dy = Number.isFinite(rawDy) ? Math.max(-1, Math.min(1, rawDy)) : 0;
       const length = Math.hypot(dx, dy) || 1;
-      const dt = 1 / GAME.serverHz;
-      player.x = Math.max(40, Math.min(GAME.width - 40, player.x + (dx / length) * player.moveSpeed * dt));
-      player.y = Math.max(40, Math.min(GAME.height - 40, player.y + (dy / length) * player.moveSpeed * dt));
+      player.x = Math.max(40, Math.min(GAME.width - 40, player.x + (dx / length) * player.moveSpeed * elapsedSeconds));
+      player.y = Math.max(40, Math.min(GAME.height - 40, player.y + (dy / length) * player.moveSpeed * elapsedSeconds));
     });
 
     this.onMessage("aim", (client, message: AimMessage) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player || player.hp <= 0) return;
-      const dx = Number(message?.x ?? player.x + 1) - player.x;
-      const dy = Number(message?.y ?? player.y) - player.y;
+      if (!player || this.state.phase !== "playing" || player.hp <= 0) return;
+      const rawX = Number(message?.x);
+      const rawY = Number(message?.y);
+      const targetX = Number.isFinite(rawX) ? rawX : player.x + 1;
+      const targetY = Number.isFinite(rawY) ? rawY : player.y;
+      const dx = targetX - player.x;
+      const dy = targetY - player.y;
       const length = Math.hypot(dx, dy) || 1;
       player.aimX = dx / length;
       player.aimY = dy / length;
     });
 
-    this.onMessage("fire", client => { fireProjectile(this.state, client.sessionId, () => `p_${this.projectileId++}`); });
+    this.onMessage("fire", client => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || this.state.phase !== "playing" || player.hp <= 0) return;
+      fireProjectile(this.state, client.sessionId, () => `p_${this.projectileId++}`);
+    });
     this.setSimulationInterval(deltaMs => this.tick(deltaMs), 1000 / GAME.serverHz);
   }
 
@@ -83,9 +100,11 @@ export class GameRoom extends Room<{ state: GameState }> {
     player.projectileSpeed = GAME.startingProjectileSpeed;
     player.pickupRadius = GAME.startingPickupRadius;
     this.state.players.set(client.sessionId, player);
+    this.lastInputAt.set(client.sessionId, Date.now());
   }
 
   onLeave(client: Client) {
+    this.lastInputAt.delete(client.sessionId);
     this.state.players.delete(client.sessionId);
     if (this.state.players.size === 0) this.state.phase = "lobby";
   }
