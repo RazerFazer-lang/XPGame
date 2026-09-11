@@ -7,13 +7,16 @@ export const GAME = {
   playerSpeed: 260,
   startingDamage: 12,
   startingAttackCooldownMs: 350,
+  startingProjectileSpeed: 760,
+  startingPickupRadius: 95,
   xpPerBasicEnemy: 10,
 } as const;
 
 export const WAVE = {
   firstDurationMs: 30_000,
-  baseEnemies: 15,
-  growthPerWave: 6,
   eliteEvery: 5,
   bossEvery: 10,
+  baseSpawnIntervalMs: 900,
+  minimumSpawnIntervalMs: 180,
+  bossWarningMs: 4_000,
 } as const;
