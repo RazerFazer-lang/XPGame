@@ -29,9 +29,17 @@ function safeWebPath(requestUrl: string) {
 }
 
 const httpServer = http.createServer((req, res) => {
-  if (req.url === "/health") {
+  const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+
+  if (pathname === "/health") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     res.end(JSON.stringify({ ok: true, service: "XPGame", multiplayer: true }));
+    return;
+  }
+
+  // Colyseus owns matchmaking routes. Leave these requests untouched so its
+  // router (bound by gameServer.listen()) can answer them.
+  if (pathname === "/matchmake" || pathname.startsWith("/matchmake/") || pathname === "/rooms" || pathname.startsWith("/rooms/")) {
     return;
   }
 
@@ -70,10 +78,14 @@ const gameServer = new Server({
 
 gameServer.define("game", GameRoom);
 
-httpServer.listen(port, host, () => {
-  console.log(`[XPGame] Server listening on 0.0.0.0:${port}`);
+void gameServer.listen(port, host).then(() => {
+  console.log(`[XPGame] Server listening on ${host}:${port}`);
   console.log(`[XPGame] Codespaces: open the forwarded port ${port} from the PORTS panel; do not open 0.0.0.0 directly.`);
   console.log(`[XPGame] Health check: /health`);
+  console.log(`[XPGame] Matchmaking: /matchmake/*`);
   console.log(`[XPGame] Game + multiplayer websocket share port ${port}.`);
   console.log(`[XPGame] Web client root: ${webRoot}`);
+}).catch(error => {
+  console.error("[XPGame] Failed to start server:", error);
+  process.exitCode = 1;
 });
