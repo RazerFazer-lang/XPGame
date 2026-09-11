@@ -12,6 +12,23 @@ interface WeaponMessage { weapon?: string; }
 
 const VALID_WEAPONS = new Set(["rifle", "shotgun", "smg", "cannon", "arc"]);
 
+function unlockAchievements(player: PlayerState, wave: number, bosses: number): void {
+  let current: string[];
+  try { current = JSON.parse(player.achievements || "[]"); } catch { current = []; }
+  const rules: Array<[string, boolean]> = [
+    ["first_blood", player.kills >= 1],
+    ["slayer", player.kills >= 50],
+    ["survivor", wave >= 10],
+    ["boss_breaker", bosses >= 1],
+    ["team_player", player.revives >= 1],
+    ["arsenal", player.weaponLevel >= 5],
+    ["millionaire", player.coins >= 1000],
+    ["legend", wave >= 20],
+  ];
+  for (const [id, condition] of rules) if (condition && !current.includes(id)) current.push(id);
+  player.achievements = JSON.stringify(current);
+}
+
 export class GameRoom extends Room<{ state: GameState }> {
   state = new GameState();
   maxClients = GAME.maxPlayers;
@@ -104,7 +121,7 @@ export class GameRoom extends Room<{ state: GameState }> {
     player.projectileSpeed = GAME.startingProjectileSpeed;
     player.pickupRadius = GAME.startingPickupRadius;
     player.lives = GAME.playerLives;
-    if (typeof options?.mapId === "string" && options.mapId in MAPS) {
+    if (this.state.players.size === 0 && typeof options?.mapId === "string" && options.mapId in MAPS) {
       this.state.mapId = options.mapId;
       this.state.mapName = MAPS[options.mapId as keyof typeof MAPS].name;
     }
@@ -190,6 +207,7 @@ export class GameRoom extends Room<{ state: GameState }> {
     for (const player of this.state.players.values()) {
       player.attackTimerMs = Math.max(0, player.attackTimerMs - deltaMs);
       this.populateUpgradeChoices(player);
+      unlockAchievements(player, this.state.wave, this.state.bossesDefeated);
     }
     this.maybeStartEvent(deltaMs);
     this.spawnWaveContent();
