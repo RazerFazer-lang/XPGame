@@ -10,7 +10,11 @@ export class PlayerState extends Schema {
   @type("number") xp = 0;
   @type("number") xpToNext = 100;
   @type("number") kills = 0;
+  @type("number") score = 0;
   @type("boolean") ready = false;
+  @type("boolean") downed = false;
+  @type("number") respawnMs = 0;
+  @type("number") lives = 3;
   @type("number") aimX = 1;
   @type("number") aimY = 0;
   @type("number") attackCooldownMs = 350;
@@ -25,9 +29,15 @@ export class PlayerState extends Schema {
   @type("number") armor = 0;
   @type("number") critChance = 0.05;
   @type("number") critMultiplier = 1.75;
+  @type("string") weapon = "rifle";
+  @type("number") weaponLevel = 1;
+  @type("string") perks = "[]";
   @type("string") upgradeChoices = "[]";
   @type("string") upgrades = "[]";
+  @type("string") achievements = "[]";
   @type("number") pendingUpgradeLevels = 0;
+  @type("number") coins = 0;
+  @type("number") revives = 0;
 }
 
 export class EnemyState extends Schema {
@@ -42,6 +52,8 @@ export class EnemyState extends Schema {
   @type("number") damage = 8;
   @type("boolean") elite = false;
   @type("boolean") boss = false;
+  @type("number") phase = 1;
+  @type("number") attackTimerMs = 0;
 }
 
 export class ProjectileState extends Schema {
@@ -63,8 +75,23 @@ export class XpDropState extends Schema {
   @type("number") lifeMs = 30000;
 }
 
+export class LootState extends Schema {
+  @type("string") kind = "coin";
+  @type("string") rarity = "common";
+  @type("number") x = 0;
+  @type("number") y = 0;
+  @type("number") value = 1;
+  @type("number") lifeMs = 30000;
+}
+
 export class GameState extends Schema {
   @type("string") phase = "lobby";
+  @type("string") roomCode = "";
+  @type("string") mapId = "neon_city";
+  @type("string") mapName = "Neon City";
+  @type("string") event = "";
+  @type("number") eventTimerMs = 0;
+  @type("string") leaderboard = "[]";
   @type("number") wave = 0;
   @type("number") elapsedMs = 0;
   @type("number") spawnTimerMs = 0;
@@ -74,4 +101,5 @@ export class GameState extends Schema {
   @type({ map: EnemyState }) enemies = new MapSchema<EnemyState>();
   @type({ map: ProjectileState }) projectiles = new MapSchema<ProjectileState>();
   @type({ map: XpDropState }) xpDrops = new MapSchema<XpDropState>();
+  @type({ map: LootState }) loot = new MapSchema<LootState>();
 }
