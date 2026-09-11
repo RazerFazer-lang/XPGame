@@ -56,11 +56,18 @@ function renderUpgradeChoices(ids: string[]) { const signature = ids.join("|"); 
 function renderLeaderboard(value: string) { try { const rows = JSON.parse(value) as Array<{name: string; score: number; kills: number; level: number}>; leaderboardEl.innerHTML = rows.length ? rows.map((r, i) => `<div class="boardRow"><span>#${i + 1} ${r.name}</span><strong>${Math.floor(r.score)}</strong></div>`).join("") : `<span class="muted">Noch keine Scores</span>`; } catch { leaderboardEl.textContent = "—"; } }
 
 async function join(mode: "quick" | "room") {
-  connectionEl.textContent = "CONNECTING..."; connectButton.disabled = true; joinButton.disabled = true;
+  connectionEl.textContent = "CHECKING SERVER..."; connectButton.disabled = true; joinButton.disabled = true;
   try {
+    const health = await fetch(`${serverUrl}/health`, { cache: "no-store" });
+    const healthText = await health.text();
+    if (!health.ok) throw new Error(`HEALTH ${health.status}: ${healthText.slice(0, 160)}`);
+    console.info("[XPGame] server health OK", serverUrl, healthText);
+    connectionEl.textContent = "CONNECTING...";
+
     const client = new Client(serverUrl);
     const options = { name: nameInput.value.trim() || "Player", mapId: mapSelect.value };
     room = mode === "room" ? await client.joinById(roomCodeInput.value.trim(), options) : await client.joinOrCreate("game", options);
+    room.onError((code: number, message: string) => { const detail = `ROOM ERROR ${code}: ${message || "unknown server error"}`; console.error("[XPGame]", detail); connectionEl.textContent = detail.slice(0, 70); showMessage(detail); });
     localSessionId = room.sessionId; ready = false; readyButton.textContent = "READY"; readyButton.disabled = false; connectionEl.textContent = "CONNECTED"; lastPhase = ""; beep(660, .08, "sine");
     room.onStateChange((state: any) => {
       const phase = String(state.phase); phaseEl.textContent = phase.toUpperCase(); eventEl.textContent = String(state.event || "—").replace(/_/g, " ").toUpperCase(); waveEl.textContent = String(state.wave); playersEl.textContent = `${state.players.size} / ${GAME.maxPlayers}`; mapNameEl.textContent = String(state.mapName); roomLabelEl.textContent = String(state.roomCode || "—"); renderLeaderboard(String(state.leaderboard || "[]"));
@@ -70,8 +77,14 @@ async function join(mode: "quick" | "room") {
       const scene = game.scene.getScene("main") as MainScene; scene.sync(state);
       if (state.event) scene.burst(GAME.width / 2, 90, 90);
     });
-    room.onLeave(() => { firing = false; lastPhase = ""; lastUpgradeSignature = ""; ready = false; readyButton.textContent = "READY"; connectionEl.textContent = "DISCONNECTED"; connectButton.disabled = false; joinButton.disabled = false; readyButton.disabled = true; room = null; overlay.classList.add("hidden"); showMessage("DISCONNECTED"); });
-  } catch (error) { console.error(error); connectionEl.textContent = "CONNECTION ERROR"; connectButton.disabled = false; joinButton.disabled = false; }
+    room.onLeave((code: number) => { firing = false; lastPhase = ""; lastUpgradeSignature = ""; ready = false; readyButton.textContent = "READY"; connectionEl.textContent = `DISCONNECTED ${code || ""}`.trim(); connectButton.disabled = false; joinButton.disabled = false; readyButton.disabled = true; room = null; overlay.classList.add("hidden"); showMessage(`DISCONNECTED${code ? ` (${code})` : ""}`); });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error("[XPGame] connection failed", { serverUrl, error });
+    connectionEl.textContent = `ERROR: ${detail}`.slice(0, 70);
+    showMessage(detail.slice(0, 180));
+    connectButton.disabled = false; joinButton.disabled = false;
+  }
 }
 connectButton.addEventListener("click", () => void join("quick")); joinButton.addEventListener("click", () => void join("room"));
 readyButton.addEventListener("click", () => { if (!room || lastPhase !== "lobby") return; ready = !ready; readyButton.textContent = ready ? "READY ✓" : "READY"; room.send("ready", ready); room.send("weapon", { weapon: weaponSelect.value }); beep(500, .05, "sine"); });
