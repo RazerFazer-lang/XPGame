@@ -7,7 +7,7 @@ import { GameRoom } from "./rooms/GameRoom.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "0.0.0.0";
-const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..", "..");
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const webRoot = path.join(rootDir, "dist");
 const contentTypes: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
