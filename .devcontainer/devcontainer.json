@@ -4,11 +4,16 @@
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
-      "label": "XPGame multiplayer",
+      "label": "XPGame – direkt spielen",
       "protocol": "http",
-      "onAutoForward": "openBrowser"
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
     }
   },
+  "otherPortsAttributes": {
+    "onAutoForward": "silent"
+  },
   "postCreateCommand": "npm install",
-  "postStartCommand": "npm run build && npm start"
+  "postStartCommand": "npm run build && npm start",
+  "waitFor": "postStartCommand"
 }
