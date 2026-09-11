@@ -9,14 +9,14 @@ interface JoinOptions { name?: string; }
 interface InputMessage { dx?: number; dy?: number; }
 interface AimMessage { x?: number; y?: number; }
 
-export class GameRoom extends Room<GameState> {
+export class GameRoom extends Room<{ state: GameState }> {
+  state = new GameState();
   maxClients = GAME.maxPlayers;
   private enemyId = 0;
   private projectileId = 0;
   private bossWaveSpawned = new Set<number>();
 
   onCreate() {
-    this.setState(new GameState());
     this.autoDispose = true;
 
     this.onMessage("ready", (client, ready: boolean) => {
@@ -35,7 +35,12 @@ export class GameRoom extends Room<GameState> {
     this.onMessage("chooseUpgrade", (client, id: string) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || !id || player.upgradeChoices === "[]") return;
-      const choices = JSON.parse(player.upgradeChoices || "[]") as string[];
+      let choices: string[];
+      try {
+        choices = JSON.parse(player.upgradeChoices || "[]") as string[];
+      } catch {
+        return;
+      }
       if (!choices.includes(id)) return;
       if (applyUpgrade(player, id)) player.upgradeChoices = "[]";
     });
