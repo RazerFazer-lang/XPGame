@@ -2,6 +2,7 @@ import { Room, Client } from "colyseus";
 import { GAME, WAVE } from "../../../shared/src/constants.js";
 import { GameState, PlayerState } from "../state/GameState.js";
 import { createEnemy, fireProjectile } from "../game/CombatSystem.js";
+import { simulateCombat } from "../game/SimulationSystem.js";
 
 interface JoinOptions { name?: string; }
 interface InputMessage { dx?: number; dy?: number; }
@@ -15,7 +16,6 @@ export class GameRoom extends Room<GameState> {
   onCreate() {
     this.setState(new GameState());
     this.autoDispose = true;
-
     this.onMessage("ready", (client, ready: boolean) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
@@ -27,7 +27,6 @@ export class GameRoom extends Room<GameState> {
         this.state.elapsedMs = 0;
       }
     });
-
     this.onMessage("input", (client, message: InputMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || this.state.phase !== "playing") return;
@@ -38,7 +37,6 @@ export class GameRoom extends Room<GameState> {
       player.x = Math.max(40, Math.min(GAME.width - 40, player.x + (dx / length) * GAME.playerSpeed * dt));
       player.y = Math.max(40, Math.min(GAME.height - 40, player.y + (dy / length) * GAME.playerSpeed * dt));
     });
-
     this.onMessage("aim", (client, message: AimMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player) return;
@@ -48,11 +46,7 @@ export class GameRoom extends Room<GameState> {
       player.aimX = dx / length;
       player.aimY = dy / length;
     });
-
-    this.onMessage("fire", (client) => {
-      fireProjectile(this.state, client.sessionId, () => `p_${this.projectileId++}`);
-    });
-
+    this.onMessage("fire", (client) => { fireProjectile(this.state, client.sessionId, () => `p_${this.projectileId++}`); });
     this.setSimulationInterval((deltaMs) => this.tick(deltaMs), 1000 / GAME.serverHz);
   }
 
@@ -74,16 +68,12 @@ export class GameRoom extends Room<GameState> {
     this.state.elapsedMs += deltaMs;
     this.state.spawnTimerMs += deltaMs;
     this.state.wave = Math.floor(this.state.elapsedMs / WAVE.firstDurationMs) + 1;
-
     const spawnInterval = Math.max(180, 1000 - this.state.wave * 35);
     while (this.state.spawnTimerMs >= spawnInterval) {
       this.state.spawnTimerMs -= spawnInterval;
-      const enemy = createEnemy(this.state.wave);
-      this.state.enemies.set(`e_${this.enemyId++}`, enemy);
+      this.state.enemies.set(`e_${this.enemyId++}`, createEnemy(this.state.wave));
     }
-
-    for (const player of this.state.players.values()) {
-      player.attackTimerMs = Math.max(0, player.attackTimerMs - deltaMs);
-    }
+    for (const player of this.state.players.values()) player.attackTimerMs = Math.max(0, player.attackTimerMs - deltaMs);
+    simulateCombat(this.state, deltaMs);
   }
 }
